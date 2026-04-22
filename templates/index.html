@@ -1,0 +1,500 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FaceMatch — Facial Recognition</title>
+    <link rel="stylesheet" href="/static/css/style.css" />
+  </head>
+  <body>
+    <canvas id="matrix-bg"></canvas>
+
+    <div class="wrapper">
+      <header>
+        <div class="brand">
+          <span class="brand-title">Face<span>Match</span></span>
+          <span class="brand-sub">Biometric Identification System</span>
+          <span class="brand-kanji">顔認証システム</span>
+        </div>
+        <div class="header-right">
+          <span class="system-time" id="system-time">00:00:00</span>
+          <button id="theme-toggle" title="Toggle theme">🕵️</button>
+        </div>
+      </header>
+
+      <div class="clearance-banner">
+        <span class="clearance-text" id="clearance-text"
+          >⚠ TOP SECRET — CLEARANCE LEVEL 5 REQUIRED</span
+        >
+        <span class="clearance-dot"></span>
+      </div>
+
+      <div class="subtitle-wrap">
+        <p class="subtitle-small" id="subtitle-small">
+          awaiting biometric input
+        </p>
+        <p class="subtitle-result" id="subtitle-result">—</p>
+      </div>
+
+      <div class="camera-card">
+        <div class="camera-offline" id="cam-offline">
+          <span class="cam-icon">📷</span>
+          <span>Initialising surveillance feed...</span>
+        </div>
+        <video id="video" autoplay muted playsinline></video>
+        <canvas id="overlay"></canvas>
+        <div class="scan-line"></div>
+        <div class="corner corner-tl"></div>
+        <div class="corner corner-tr"></div>
+        <div class="corner corner-bl"></div>
+        <div class="corner corner-br"></div>
+        <div class="scan-indicator" id="scan-indicator">● PROFILE LOCKED</div>
+      </div>
+
+      <div class="radar-wrap" id="radar-wrap">
+        <div class="radar">
+          <div class="radar-ring"></div>
+          <div class="radar-ring"></div>
+          <div class="radar-ring"></div>
+          <div class="radar-center"></div>
+        </div>
+      </div>
+
+      <div
+        class="status-panel"
+        id="status-panel"
+        role="status"
+        aria-live="polite"
+      >
+        <span class="status-icon" id="status-icon">⏳</span>
+        <span class="status-text" id="status-text">Initialising system...</span>
+      </div>
+
+      <div class="distance-wrap" id="distance-wrap">
+        <div class="distance-label">
+          <span>Biometric Similarity</span>
+          <span id="distance-val">—</span>
+        </div>
+        <div class="distance-bar-bg">
+          <div class="distance-bar-fill" id="distance-bar"></div>
+        </div>
+      </div>
+
+      <div class="quality-row" id="quality-row">
+        <div class="quality-card">
+          <div class="quality-label">Ref Blur Score</div>
+          <div class="quality-value" id="q-ref-blur">—</div>
+        </div>
+        <div class="quality-card">
+          <div class="quality-label">Comp Blur Score</div>
+          <div class="quality-value" id="q-comp-blur">—</div>
+        </div>
+        <div class="quality-card">
+          <div class="quality-label">Ref Face Size</div>
+          <div class="quality-value" id="q-ref-size">—</div>
+        </div>
+        <div class="quality-card">
+          <div class="quality-label">Comp Face Size</div>
+          <div class="quality-value" id="q-comp-size">—</div>
+        </div>
+      </div>
+
+      <div class="btn-group">
+        <button
+          class="btn btn-scan"
+          id="btn-scan"
+          disabled
+          aria-label="Scan reference face"
+        >
+          <span class="btn-icon">⬤</span>
+          <span class="btn-label">Scan</span>
+        </button>
+        <button
+          class="btn btn-compare"
+          id="btn-compare"
+          disabled
+          aria-label="Compare faces"
+        >
+          <span class="btn-icon">◈</span>
+          <span class="btn-label">Compare</span>
+        </button>
+        <button
+          class="btn btn-reset"
+          id="btn-reset"
+          disabled
+          aria-label="Reset profile"
+        >
+          <span class="btn-icon">↺</span>
+          <span class="btn-label">Reset</span>
+        </button>
+      </div>
+
+      <footer>
+        Face recognition powered by Python · Quality checks active
+        <span class="footer-jp">顔認証 · 生体認証システム · セキュリティ</span>
+      </footer>
+    </div>
+
+    <script>
+      const API_ENDPOINT = "/verify";
+
+      let storedImage = null;
+      let isProcessing = false;
+      let cameraReady = false;
+      let isAnime = false;
+
+      // ── DOM refs ─────────────────────────────────
+      const video = document.getElementById("video");
+      const overlay = document.getElementById("overlay");
+      const ctx = overlay.getContext("2d");
+      const camOffline = document.getElementById("cam-offline");
+      const scanBtn = document.getElementById("btn-scan");
+      const compareBtn = document.getElementById("btn-compare");
+      const resetBtn = document.getElementById("btn-reset");
+      const statusPanel = document.getElementById("status-panel");
+      const statusIcon = document.getElementById("status-icon");
+      const statusText = document.getElementById("status-text");
+      const subtitleRes = document.getElementById("subtitle-result");
+      const subtitleSmall = document.getElementById("subtitle-small");
+      const scanBadge = document.getElementById("scan-indicator");
+      const distWrap = document.getElementById("distance-wrap");
+      const distBar = document.getElementById("distance-bar");
+      const distVal = document.getElementById("distance-val");
+      const qualityRow = document.getElementById("quality-row");
+      const themeToggle = document.getElementById("theme-toggle");
+      const radarWrap = document.getElementById("radar-wrap");
+      const clearanceText = document.getElementById("clearance-text");
+      const matrixCanvas = document.getElementById("matrix-bg");
+      const mCtx = matrixCanvas.getContext("2d");
+      const systemTime = document.getElementById("system-time");
+
+      // ── Live clock ───────────────────────────────
+      function updateClock() {
+        const now = new Date();
+        systemTime.textContent = now.toTimeString().split(" ")[0];
+      }
+      setInterval(updateClock, 1000);
+      updateClock();
+
+      // ── Theme toggle ─────────────────────────────
+      const CIA_MESSAGES = {
+        camera: "📷 CAMERA ACTIVE — SURVEILLANCE ONLINE",
+        scan: "🔒 FACE BIOMETRIC PROFILE LOCKED",
+        compare: "🔍 RUNNING FACE BIOMETRIC ANALYSIS... PLEASE STAND BY",
+        reset: "🗑️ FACE BIOMETRIC PROFILE PURGED",
+        ready: "📷 CAMERA ACTIVE — SURVEILLANCE ONLINE",
+        waiting: "⏳ AWAITING FACE BIOMETRIC CAPTURE",
+        denied:
+          "🚫 Camera access was blocked. Please allow permissions and reload.",
+        match: "✅ IDENTITY CONFIRMED — FACE BIOMETRIC MATCH",
+        nomatch: "❌ IDENTITY DENIED — FACE BIOMETRIC MISMATCH",
+        partial: "⚠️ CAUTION — PARTIAL FACE BIOMETRIC OVERLAP DETECTED",
+        network: "🔌 Connection lost. Ensure Flask server is running.",
+        clearance: "⚠ TOP SECRET — CLEARANCE LEVEL 5 REQUIRED",
+        subtitle: "awaiting biometric input",
+      };
+
+      const ANIME_MESSAGES = {
+        camera: "📷 映像システム起動 — VISUAL SYSTEM ONLINE",
+        scan: "🔒 顔認証プロファイル — FACE BIOMETRIC LOCKED",
+        compare: "🔍 顔認証解析中 — FACE BIOMETRIC SCAN INITIATED",
+        reset: "🗑️ プロファイル削除 — FACE BIOMETRIC PURGED",
+        ready: "📷 映像システム起動 — VISUAL SYSTEM ONLINE",
+        waiting: "⏳ 顔認証入力待機 — AWAITING FACE BIOMETRIC",
+        denied: "🚫 カメラアクセス拒否 — Please allow permissions and reload.",
+        match: "✅ 同一人物確認 — IDENTITY CONFIRMED",
+        nomatch: "❌ 不一致検出 — IDENTITY MISMATCH DETECTED",
+        partial: "⚠️ 部分一致警告 — PARTIAL BIOMETRIC OVERLAP",
+        network: "🔌 接続失敗 — Connection lost. Check Flask server.",
+        clearance: "⚠ 機密情報 — BIOMETRIC CLEARANCE REQUIRED",
+        subtitle: "生体認証入力待機中",
+      };
+
+      function getMsg() {
+        return isAnime ? ANIME_MESSAGES : CIA_MESSAGES;
+      }
+
+      themeToggle.addEventListener("click", () => {
+        isAnime = !isAnime;
+        document.body.classList.toggle("anime", isAnime);
+        themeToggle.textContent = isAnime ? "⛩️" : "🕵️";
+        clearanceText.textContent = getMsg().clearance;
+        subtitleSmall.textContent = getMsg().subtitle;
+        if (cameraReady && !storedImage) {
+          setStatus("📷", getMsg().ready);
+        }
+        restartMatrix();
+      });
+
+      // ── Status helper ─────────────────────────────
+      function setStatus(icon, msg) {
+        statusPanel.classList.remove("animate");
+        void statusPanel.offsetWidth;
+        statusPanel.classList.add("animate");
+        statusIcon.textContent = icon;
+        statusText.textContent = msg;
+      }
+
+      // ── Camera ────────────────────────────────────
+      async function startCamera() {
+        setStatus("⏳", "Initialising system...");
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              facingMode: "user",
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+            },
+            audio: false,
+          });
+          video.srcObject = stream;
+          video.addEventListener("loadedmetadata", () => {
+            overlay.width = video.videoWidth;
+            overlay.height = video.videoHeight;
+            camOffline.style.display = "none";
+            cameraReady = true;
+            scanBtn.disabled = false;
+            setStatus("📷", getMsg().ready);
+          });
+        } catch (err) {
+          camOffline.innerHTML = `<span class="cam-icon">🚫</span><span>${getMsg().denied}</span>`;
+          setStatus("🚫", getMsg().denied);
+        }
+      }
+
+      window.addEventListener("beforeunload", () => {
+        if (video.srcObject)
+          video.srcObject.getTracks().forEach((t) => t.stop());
+      });
+
+      // ── Capture frame ─────────────────────────────
+      function captureFrame() {
+        const w = video.videoWidth,
+          h = video.videoHeight;
+        const cap = document.createElement("canvas");
+        cap.width = w;
+        cap.height = h;
+        const c = cap.getContext("2d");
+        c.translate(w, 0);
+        c.scale(-1, 1);
+        c.drawImage(video, 0, 0, w, h);
+        return cap.toDataURL("image/jpeg", 0.85);
+      }
+
+      // ── Draw scan frame ───────────────────────────
+      function drawScanFrame() {
+        const w = overlay.width,
+          h = overlay.height;
+        ctx.clearRect(0, 0, w, h);
+        const bx = w * 0.28,
+          by = h * 0.12,
+          bw = w * 0.44,
+          bh = h * 0.74;
+        ctx.strokeStyle = isAnime ? "#00ffff" : "#00ff41";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(bx, by, bw, bh);
+        const t = 18;
+        ctx.lineWidth = 3;
+        [
+          [bx, by],
+          [bx + bw, by],
+          [bx, by + bh],
+          [bx + bw, by + bh],
+        ].forEach(([x, y], i) => {
+          ctx.beginPath();
+          const sx = i % 2 === 0 ? 1 : -1,
+            sy = i < 2 ? 1 : -1;
+          ctx.moveTo(x, y + sy * t);
+          ctx.lineTo(x, y);
+          ctx.lineTo(x + sx * t, y);
+          ctx.stroke();
+        });
+      }
+
+      function clearOverlay() {
+        ctx.clearRect(0, 0, overlay.width, overlay.height);
+      }
+
+      // ── Show result ───────────────────────────────
+      function showResult(data) {
+        const isMatch = data.match;
+        const pct = Math.max(0, Math.min(100, (1 - data.distance) * 100));
+        const isPartial = !isMatch && pct > 40;
+
+        subtitleRes.textContent = isMatch ? "✅ MATCH" : "❌ MISMATCH";
+        subtitleRes.className =
+          "subtitle-result " + (isMatch ? "match" : "mismatch");
+
+        if (isMatch) {
+          setStatus("✅", getMsg().match + ` — DISTANCE: ${data.distance}`);
+        } else if (isPartial) {
+          setStatus("⚠️", getMsg().partial + ` — DISTANCE: ${data.distance}`);
+        } else {
+          setStatus("❌", getMsg().nomatch + ` — DISTANCE: ${data.distance}`);
+        }
+
+        distWrap.classList.add("visible");
+        distBar.style.width = pct + "%";
+        distBar.className = "distance-bar-fill" + (isMatch ? " match" : "");
+        distVal.textContent = `${pct.toFixed(1)}% similar`;
+
+        if (data.quality) {
+          qualityRow.classList.add("visible");
+          document.getElementById("q-ref-blur").textContent =
+            data.quality.ref_blur;
+          document.getElementById("q-comp-blur").textContent =
+            data.quality.comp_blur;
+          document.getElementById("q-ref-size").textContent =
+            data.quality.ref_size;
+          document.getElementById("q-comp-size").textContent =
+            data.quality.comp_size;
+        }
+      }
+
+      // ── Buttons ───────────────────────────────────
+      scanBtn.addEventListener("click", () => {
+        if (!cameraReady || isProcessing) return;
+        storedImage = captureFrame();
+        scanBtn.classList.add("pulsing");
+        setTimeout(() => scanBtn.classList.remove("pulsing"), 800);
+        drawScanFrame();
+        scanBadge.classList.add("visible");
+        compareBtn.disabled = false;
+        resetBtn.disabled = false;
+        setStatus("🔒", getMsg().scan);
+        subtitleRes.textContent = "—";
+        subtitleRes.className = "subtitle-result";
+        distWrap.classList.remove("visible");
+        qualityRow.classList.remove("visible");
+      });
+
+      compareBtn.addEventListener("click", async () => {
+        if (!cameraReady || isProcessing || !storedImage) return;
+        isProcessing = true;
+        setButtonsDisabled(true);
+        radarWrap.classList.add("visible");
+        setStatus("🔍", getMsg().compare);
+        const currentImage = captureFrame();
+        try {
+          const response = await fetch(API_ENDPOINT, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ image1: storedImage, image2: currentImage }),
+          });
+          const data = await response.json();
+          radarWrap.classList.remove("visible");
+          if (!response.ok) {
+            setStatus("⚠️", `ERROR: ${data.error || "Unknown error."}`);
+            subtitleRes.textContent = "⚠️ ERROR";
+            subtitleRes.className = "subtitle-result mismatch";
+          } else {
+            showResult(data);
+          }
+        } catch (err) {
+          radarWrap.classList.remove("visible");
+          setStatus("🔌", getMsg().network);
+        }
+        isProcessing = false;
+        setButtonsDisabled(false);
+        clearOverlay();
+      });
+
+      resetBtn.addEventListener("click", () => {
+        storedImage = null;
+        scanBadge.classList.remove("visible");
+        compareBtn.disabled = true;
+        resetBtn.disabled = true;
+        subtitleRes.textContent = "—";
+        subtitleRes.className = "subtitle-result";
+        distWrap.classList.remove("visible");
+        qualityRow.classList.remove("visible");
+        radarWrap.classList.remove("visible");
+        clearOverlay();
+        setStatus("🗑️", getMsg().reset);
+      });
+
+      function setButtonsDisabled(d) {
+        scanBtn.disabled = d;
+        compareBtn.disabled = d || !storedImage;
+        resetBtn.disabled = d || !storedImage;
+      }
+
+      // Keyboard shortcuts
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "s" || e.key === "S") scanBtn.click();
+        if (e.key === "c" || e.key === "C") compareBtn.click();
+        if (e.key === "r" || e.key === "R") resetBtn.click();
+      });
+
+      // ── Matrix / Particle background ──────────────
+      let matrixInterval;
+
+      function restartMatrix() {
+        clearInterval(matrixInterval);
+        matrixCanvas.width = window.innerWidth;
+        matrixCanvas.height = window.innerHeight;
+        if (isAnime) {
+          startParticles();
+        } else {
+          startMatrix();
+        }
+      }
+
+      // CIA — matrix rain
+      function startMatrix() {
+        const cols = Math.floor(matrixCanvas.width / 16);
+        const drops = Array(cols).fill(1);
+        const chars =
+          "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&アイウエオカキクケコサシスセソ";
+
+        matrixInterval = setInterval(() => {
+          mCtx.fillStyle = "rgba(0,0,0,0.05)";
+          mCtx.fillRect(0, 0, matrixCanvas.width, matrixCanvas.height);
+          mCtx.fillStyle = "#00ff41";
+          mCtx.font = "14px Share Tech Mono";
+          drops.forEach((y, i) => {
+            const char = chars[Math.floor(Math.random() * chars.length)];
+            mCtx.fillText(char, i * 16, y * 16);
+            if (y * 16 > matrixCanvas.height && Math.random() > 0.975)
+              drops[i] = 0;
+            drops[i]++;
+          });
+        }, 50);
+      }
+
+      // Anime — floating particles
+      function startParticles() {
+        const particles = Array.from({ length: 60 }, () => ({
+          x: Math.random() * matrixCanvas.width,
+          y: Math.random() * matrixCanvas.height,
+          size: Math.random() * 3 + 1,
+          speedX: (Math.random() - 0.5) * 0.5,
+          speedY: -Math.random() * 0.8 - 0.2,
+          opacity: Math.random() * 0.6 + 0.2,
+          char: ["✦", "✧", "◇", "○", "×", "＊", "　"][
+            Math.floor(Math.random() * 7)
+          ],
+        }));
+
+        matrixInterval = setInterval(() => {
+          mCtx.clearRect(0, 0, matrixCanvas.width, matrixCanvas.height);
+          particles.forEach((p) => {
+            mCtx.fillStyle = `rgba(0,255,255,${p.opacity})`;
+            mCtx.font = `${p.size * 6}px Noto Sans JP`;
+            mCtx.fillText(p.char, p.x, p.y);
+            p.x += p.speedX;
+            p.y += p.speedY;
+            if (p.y < -20) {
+              p.y = matrixCanvas.height + 20;
+              p.x = Math.random() * matrixCanvas.width;
+            }
+          });
+        }, 40);
+      }
+
+      window.addEventListener("resize", restartMatrix);
+      restartMatrix();
+      startCamera();
+    </script>
+  </body>
+</html>
