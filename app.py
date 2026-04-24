@@ -9,7 +9,7 @@ import face_recognition
 
 app = Flask(__name__)
 
-MATCH_THRESHOLD = 0.45
+MATCH_THRESHOLD = 0.6
 MIN_FACE_SIZE   = 100
 BLUR_THRESHOLD  = 80
 

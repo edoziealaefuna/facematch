@@ -3,43 +3,39 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>FaceMatch — Facial Recognition</title>
+    <title>SnapScan — Biometric Face Recognition</title>
     <link rel="stylesheet" href="/static/css/style.css" />
   </head>
   <body>
-    <canvas id="matrix-bg"></canvas>
+    <canvas id="wave-bg"></canvas>
 
     <div class="wrapper">
+      <!-- ── Header ─────────────────────────────── -->
       <header>
         <div class="brand">
-          <span class="brand-title">Face<span>Match</span></span>
+          <div class="brand-title">
+            <span class="char" style="animation-delay: 0s">S</span>
+            <span class="char" style="animation-delay: 0.15s">n</span>
+            <span class="char" style="animation-delay: 0.3s">a</span>
+            <span class="char" style="animation-delay: 0.45s">p</span>
+            <span class="char accent" style="animation-delay: 0.6s">S</span>
+            <span class="char accent" style="animation-delay: 0.75s">c</span>
+            <span class="char accent" style="animation-delay: 0.9s">a</span>
+            <span class="char accent" style="animation-delay: 1.05s">n</span>
+          </div>
           <span class="brand-sub">Biometric Identification System</span>
-          <span class="brand-kanji">顔認証システム</span>
         </div>
         <div class="header-right">
           <span class="system-time" id="system-time">00:00:00</span>
-          <button id="theme-toggle" title="Toggle theme">🕵️</button>
+          <div class="live-dot">Live</div>
         </div>
       </header>
 
-      <div class="clearance-banner">
-        <span class="clearance-text" id="clearance-text"
-          >⚠ TOP SECRET — CLEARANCE LEVEL 5 REQUIRED</span
-        >
-        <span class="clearance-dot"></span>
-      </div>
-
-      <div class="subtitle-wrap">
-        <p class="subtitle-small" id="subtitle-small">
-          awaiting biometric input
-        </p>
-        <p class="subtitle-result" id="subtitle-result">—</p>
-      </div>
-
+      <!-- ── Camera ─────────────────────────────── -->
       <div class="camera-card">
         <div class="camera-offline" id="cam-offline">
-          <span class="cam-icon">📷</span>
-          <span>Initialising surveillance feed...</span>
+          <span class="cam-icon">🌊</span>
+          <span>Initialising ocean scan...</span>
         </div>
         <video id="video" autoplay muted playsinline></video>
         <canvas id="overlay"></canvas>
@@ -51,15 +47,7 @@
         <div class="scan-indicator" id="scan-indicator">● PROFILE LOCKED</div>
       </div>
 
-      <div class="radar-wrap" id="radar-wrap">
-        <div class="radar">
-          <div class="radar-ring"></div>
-          <div class="radar-ring"></div>
-          <div class="radar-ring"></div>
-          <div class="radar-center"></div>
-        </div>
-      </div>
-
+      <!-- ── Status ─────────────────────────────── -->
       <div
         class="status-panel"
         id="status-panel"
@@ -70,6 +58,17 @@
         <span class="status-text" id="status-text">Initialising system...</span>
       </div>
 
+      <!-- ── Radar ──────────────────────────────── -->
+      <div class="radar-wrap" id="radar-wrap">
+        <div class="radar">
+          <div class="radar-ring"></div>
+          <div class="radar-ring"></div>
+          <div class="radar-ring"></div>
+          <div class="radar-center"></div>
+        </div>
+      </div>
+
+      <!-- ── Distance bar ───────────────────────── -->
       <div class="distance-wrap" id="distance-wrap">
         <div class="distance-label">
           <span>Biometric Similarity</span>
@@ -80,6 +79,7 @@
         </div>
       </div>
 
+      <!-- ── Quality stats ──────────────────────── -->
       <div class="quality-row" id="quality-row">
         <div class="quality-card">
           <div class="quality-label">Ref Blur Score</div>
@@ -99,7 +99,8 @@
         </div>
       </div>
 
-      <div class="btn-group">
+      <!-- ── Buttons ────────────────────────────── -->
+      <div class="btn-group" id="btn-group">
         <button
           class="btn btn-scan"
           id="btn-scan"
@@ -118,20 +119,32 @@
           <span class="btn-icon">◈</span>
           <span class="btn-label">Compare</span>
         </button>
-        <button
-          class="btn btn-reset"
-          id="btn-reset"
-          disabled
-          aria-label="Reset profile"
-        >
-          <span class="btn-icon">↺</span>
-          <span class="btn-label">Reset</span>
-        </button>
       </div>
 
+      <!-- ── Result ─────────────────────────────── -->
+      <div class="result-wrap hidden" id="result-wrap">
+        <div class="subtitle-result" id="subtitle-result">—</div>
+        <div class="quirky-line" id="quirky-line"></div>
+        <button
+          class="btn-reset-small"
+          id="btn-reset"
+          aria-label="Reset profile"
+        >
+          ↺ reset
+        </button>
+      </div>
+      <!-- ── Footer ─────────────────────────────── -->
       <footer>
-        Face recognition powered by Python · Quality checks active
-        <span class="footer-jp">顔認証 · 生体認証システム · セキュリティ</span>
+        <div class="footer-main">
+          "Every face tells a story — SnapScan reads it"
+        </div>
+        <div class="footer-sig">
+          <span class="footer-name">raphaelcode.</span>
+          <span class="footer-tag">code is art</span>
+        </div>
+        <div class="footer-sub">
+          Powered by Python · face-recognition · opencv
+        </div>
       </footer>
     </div>
 
@@ -141,9 +154,8 @@
       let storedImage = null;
       let isProcessing = false;
       let cameraReady = false;
-      let isAnime = false;
 
-      // ── DOM refs ─────────────────────────────────
+      // ── DOM refs ──────────────────────────────────
       const video = document.getElementById("video");
       const overlay = document.getElementById("overlay");
       const ctx = overlay.getContext("2d");
@@ -155,84 +167,147 @@
       const statusIcon = document.getElementById("status-icon");
       const statusText = document.getElementById("status-text");
       const subtitleRes = document.getElementById("subtitle-result");
-      const subtitleSmall = document.getElementById("subtitle-small");
+      const quirkyLine = document.getElementById("quirky-line");
       const scanBadge = document.getElementById("scan-indicator");
       const distWrap = document.getElementById("distance-wrap");
       const distBar = document.getElementById("distance-bar");
       const distVal = document.getElementById("distance-val");
       const qualityRow = document.getElementById("quality-row");
-      const themeToggle = document.getElementById("theme-toggle");
       const radarWrap = document.getElementById("radar-wrap");
-      const clearanceText = document.getElementById("clearance-text");
-      const matrixCanvas = document.getElementById("matrix-bg");
-      const mCtx = matrixCanvas.getContext("2d");
       const systemTime = document.getElementById("system-time");
+      const waveCanvas = document.getElementById("wave-bg");
+      const wCtx = waveCanvas.getContext("2d");
 
-      // ── Live clock ───────────────────────────────
-      function updateClock() {
-        const now = new Date();
-        systemTime.textContent = now.toTimeString().split(" ")[0];
-      }
-      setInterval(updateClock, 1000);
-      updateClock();
-
-      // ── Theme toggle ─────────────────────────────
-      const CIA_MESSAGES = {
-        camera: "📷 CAMERA ACTIVE — SURVEILLANCE ONLINE",
-        scan: "🔒 FACE BIOMETRIC PROFILE LOCKED",
-        compare: "🔍 RUNNING FACE BIOMETRIC ANALYSIS... PLEASE STAND BY",
-        reset: "🗑️ FACE BIOMETRIC PROFILE PURGED",
-        ready: "📷 CAMERA ACTIVE — SURVEILLANCE ONLINE",
-        waiting: "⏳ AWAITING FACE BIOMETRIC CAPTURE",
+      // ── Messages ──────────────────────────────────
+      const MSG = {
+        ready: "📷 Camera ready - take a scan",
+        scan: "🔒 Scan locked in",
+        compare: "🔍 Analysis running . . . please stand by",
+        reset: "🗑️ Scan profile cleared",
         denied:
           "🚫 Camera access was blocked. Please allow permissions and reload.",
-        match: "✅ IDENTITY CONFIRMED — FACE BIOMETRIC MATCH",
-        nomatch: "❌ IDENTITY DENIED — FACE BIOMETRIC MISMATCH",
-        partial: "⚠️ CAUTION — PARTIAL FACE BIOMETRIC OVERLAP DETECTED",
-        network: "🔌 Connection lost. Ensure Flask server is running.",
-        clearance: "⚠ TOP SECRET — CLEARANCE LEVEL 5 REQUIRED",
-        subtitle: "awaiting biometric input",
+        match: "✅ Scan confirmed - face match",
+        nomatch: "❌ Scan confirmed - face mismatch",
+        network: "🔌 Connection waves lost. Ensure flask server is running.",
       };
 
-      const ANIME_MESSAGES = {
-        camera: "📷 映像システム起動 — VISUAL SYSTEM ONLINE",
-        scan: "🔒 顔認証プロファイル — FACE BIOMETRIC LOCKED",
-        compare: "🔍 顔認証解析中 — FACE BIOMETRIC SCAN INITIATED",
-        reset: "🗑️ プロファイル削除 — FACE BIOMETRIC PURGED",
-        ready: "📷 映像システム起動 — VISUAL SYSTEM ONLINE",
-        waiting: "⏳ 顔認証入力待機 — AWAITING FACE BIOMETRIC",
-        denied: "🚫 カメラアクセス拒否 — Please allow permissions and reload.",
-        match: "✅ 同一人物確認 — IDENTITY CONFIRMED",
-        nomatch: "❌ 不一致検出 — IDENTITY MISMATCH DETECTED",
-        partial: "⚠️ 部分一致警告 — PARTIAL BIOMETRIC OVERLAP",
-        network: "🔌 接続失敗 — Connection lost. Check Flask server.",
-        clearance: "⚠ 機密情報 — BIOMETRIC CLEARANCE REQUIRED",
-        subtitle: "生体認証入力待機中",
-      };
+      // ── Quirky lines ──────────────────────────────
+      const QUIRKY_MATCH = [
+        "Are you twins? The algorithm is shook 👀",
+        "Suspiciously similar... we're watching you 👁️",
+        "Same face energy detected 🌊",
+      ];
+      const QUIRKY_NEAR = [
+        "Are you twins? Because this is too close to call 👀",
+        "Distant cousins? The cheekbones don't lie 🧬",
+        "Almost identical — fate had other plans 🌊",
+      ];
+      const QUIRKY_MISMATCH = [
+        "Completely unique faces — you're a 1 in 7 billion combo 🌊",
+        "No two faces alike — science just proved it ✨",
+        "Different in all the right ways 🐚",
+      ];
 
-      function getMsg() {
-        return isAnime ? ANIME_MESSAGES : CIA_MESSAGES;
+      function getRandom(arr) {
+        return arr[Math.floor(Math.random() * arr.length)];
       }
 
-      themeToggle.addEventListener("click", () => {
-        isAnime = !isAnime;
-        document.body.classList.toggle("anime", isAnime);
-        themeToggle.textContent = isAnime ? "⛩️" : "🕵️";
-        clearanceText.textContent = getMsg().clearance;
-        subtitleSmall.textContent = getMsg().subtitle;
-        if (cameraReady && !storedImage) {
-          setStatus("📷", getMsg().ready);
-        }
-        restartMatrix();
-      });
+      // ── Clock ─────────────────────────────────────
+      setInterval(() => {
+        systemTime.textContent = new Date().toTimeString().split(" ")[0];
+      }, 1000);
 
-      // ── Status helper ─────────────────────────────
-      function setStatus(icon, msg) {
-        statusPanel.classList.remove("animate");
+      // ── Wave background ───────────────────────────
+      let waveOffset = 0;
+
+      function resizeWave() {
+        waveCanvas.width = window.innerWidth;
+        waveCanvas.height = window.innerHeight;
+      }
+
+      function drawWaves() {
+        wCtx.clearRect(0, 0, waveCanvas.width, waveCanvas.height);
+
+        const waves = [
+          {
+            amp: 80,
+            freq: 0.004,
+            speed: 0.008,
+            color: "rgba(100,216,180,0.5)",
+            y: waveCanvas.height * 0.45,
+          },
+          {
+            amp: 60,
+            freq: 0.006,
+            speed: 0.005,
+            color: "rgba(100,150,216,0.4)",
+            y: waveCanvas.height * 0.58,
+          },
+          {
+            amp: 70,
+            freq: 0.003,
+            speed: 0.006,
+            color: "rgba(255,107,107,0.25)",
+            y: waveCanvas.height * 0.68,
+          },
+          {
+            amp: 50,
+            freq: 0.007,
+            speed: 0.004,
+            color: "rgba(100,216,180,0.3)",
+            y: waveCanvas.height * 0.35,
+          },
+        ];
+
+        waves.forEach((wave) => {
+          wCtx.beginPath();
+          wCtx.moveTo(0, wave.y);
+          for (let x = 0; x <= waveCanvas.width; x += 6) {
+            const y =
+              wave.y +
+              Math.sin(x * wave.freq + waveOffset * wave.speed * 10) * wave.amp;
+            wCtx.lineTo(x, y);
+          }
+          wCtx.lineTo(waveCanvas.width, waveCanvas.height);
+          wCtx.lineTo(0, waveCanvas.height);
+          wCtx.closePath();
+          wCtx.fillStyle = wave.color;
+          wCtx.fill();
+        });
+
+        waveOffset++;
+        requestAnimationFrame(drawWaves);
+      }
+
+      window.addEventListener("resize", resizeWave);
+      resizeWave();
+      drawWaves();
+
+      // ── Status helpers ────────────────────────────
+      function setStatus(icon, msg, wavy = false) {
+        statusPanel.classList.remove("animate", "alarm");
         void statusPanel.offsetWidth;
         statusPanel.classList.add("animate");
         statusIcon.textContent = icon;
+        if (wavy) {
+          const words = msg.split(" ");
+          statusText.innerHTML = words
+            .map((w) => `<span>${w}&nbsp;</span>`)
+            .join("");
+          statusText.classList.add("wavy");
+        } else {
+          statusText.textContent = msg;
+          statusText.classList.remove("wavy");
+        }
+      }
+
+      function setAlarm(icon, msg) {
+        statusPanel.classList.remove("animate", "alarm");
+        void statusPanel.offsetWidth;
+        statusPanel.classList.add("alarm");
+        statusIcon.textContent = icon;
         statusText.textContent = msg;
+        statusText.classList.remove("wavy");
       }
 
       // ── Camera ────────────────────────────────────
@@ -254,11 +329,11 @@
             camOffline.style.display = "none";
             cameraReady = true;
             scanBtn.disabled = false;
-            setStatus("📷", getMsg().ready);
+            setStatus("📷", MSG.ready);
           });
         } catch (err) {
-          camOffline.innerHTML = `<span class="cam-icon">🚫</span><span>${getMsg().denied}</span>`;
-          setStatus("🚫", getMsg().denied);
+          camOffline.innerHTML = `<span class="cam-icon">🚫</span><span>${MSG.denied}</span>`;
+          setStatus("🚫", MSG.denied);
         }
       }
 
@@ -290,10 +365,10 @@
           by = h * 0.12,
           bw = w * 0.44,
           bh = h * 0.74;
-        ctx.strokeStyle = isAnime ? "#00ffff" : "#00ff41";
+        ctx.strokeStyle = "#64d8b4";
         ctx.lineWidth = 2;
         ctx.strokeRect(bx, by, bw, bh);
-        const t = 18;
+        const t = 20;
         ctx.lineWidth = 3;
         [
           [bx, by],
@@ -319,19 +394,22 @@
       function showResult(data) {
         const isMatch = data.match;
         const pct = Math.max(0, Math.min(100, (1 - data.distance) * 100));
-        const isPartial = !isMatch && pct > 40;
+        const isNear = !isMatch && pct >= 40;
 
         subtitleRes.textContent = isMatch ? "✅ MATCH" : "❌ MISMATCH";
         subtitleRes.className =
           "subtitle-result " + (isMatch ? "match" : "mismatch");
 
-        if (isMatch) {
-          setStatus("✅", getMsg().match + ` — DISTANCE: ${data.distance}`);
-        } else if (isPartial) {
-          setStatus("⚠️", getMsg().partial + ` — DISTANCE: ${data.distance}`);
-        } else {
-          setStatus("❌", getMsg().nomatch + ` — DISTANCE: ${data.distance}`);
-        }
+        let quirky = isMatch
+          ? getRandom(QUIRKY_MATCH)
+          : isNear
+            ? getRandom(QUIRKY_NEAR)
+            : getRandom(QUIRKY_MISMATCH);
+
+        quirkyLine.textContent = quirky;
+        quirkyLine.classList.add("visible");
+
+        setStatus(isMatch ? "✅" : "❌", isMatch ? MSG.match : MSG.nomatch);
 
         distWrap.classList.add("visible");
         distBar.style.width = pct + "%";
@@ -349,6 +427,10 @@
           document.getElementById("q-comp-size").textContent =
             data.quality.comp_size;
         }
+
+        // Hide buttons, show result
+        document.getElementById("btn-group").classList.add("hidden");
+        document.getElementById("result-wrap").classList.remove("hidden");
       }
 
       // ── Buttons ───────────────────────────────────
@@ -361,7 +443,8 @@
         scanBadge.classList.add("visible");
         compareBtn.disabled = false;
         resetBtn.disabled = false;
-        setStatus("🔒", getMsg().scan);
+        quirkyLine.classList.remove("visible");
+        setStatus("🔒", MSG.scan);
         subtitleRes.textContent = "—";
         subtitleRes.className = "subtitle-result";
         distWrap.classList.remove("visible");
@@ -373,7 +456,7 @@
         isProcessing = true;
         setButtonsDisabled(true);
         radarWrap.classList.add("visible");
-        setStatus("🔍", getMsg().compare);
+        setStatus("🔍", MSG.compare, true);
         const currentImage = captureFrame();
         try {
           const response = await fetch(API_ENDPOINT, {
@@ -384,7 +467,7 @@
           const data = await response.json();
           radarWrap.classList.remove("visible");
           if (!response.ok) {
-            setStatus("⚠️", `ERROR: ${data.error || "Unknown error."}`);
+            setStatus("⚠️", `Error: ${data.error || "Unknown error."}`);
             subtitleRes.textContent = "⚠️ ERROR";
             subtitleRes.className = "subtitle-result mismatch";
           } else {
@@ -392,7 +475,7 @@
           }
         } catch (err) {
           radarWrap.classList.remove("visible");
-          setStatus("🔌", getMsg().network);
+          setStatus("🔌", MSG.network);
         }
         isProcessing = false;
         setButtonsDisabled(false);
@@ -402,15 +485,19 @@
       resetBtn.addEventListener("click", () => {
         storedImage = null;
         scanBadge.classList.remove("visible");
-        compareBtn.disabled = true;
-        resetBtn.disabled = true;
+        compareBtn.disabled = false;
         subtitleRes.textContent = "—";
         subtitleRes.className = "subtitle-result";
+        quirkyLine.classList.remove("visible");
         distWrap.classList.remove("visible");
         qualityRow.classList.remove("visible");
         radarWrap.classList.remove("visible");
         clearOverlay();
-        setStatus("🗑️", getMsg().reset);
+        setAlarm("🗑️", MSG.reset);
+
+        // Show buttons, hide result
+        document.getElementById("btn-group").classList.remove("hidden");
+        document.getElementById("result-wrap").classList.add("hidden");
       });
 
       function setButtonsDisabled(d) {
@@ -419,81 +506,14 @@
         resetBtn.disabled = d || !storedImage;
       }
 
-      // Keyboard shortcuts
+      // ── Keyboard shortcuts ────────────────────────
       document.addEventListener("keydown", (e) => {
         if (e.key === "s" || e.key === "S") scanBtn.click();
         if (e.key === "c" || e.key === "C") compareBtn.click();
         if (e.key === "r" || e.key === "R") resetBtn.click();
       });
 
-      // ── Matrix / Particle background ──────────────
-      let matrixInterval;
-
-      function restartMatrix() {
-        clearInterval(matrixInterval);
-        matrixCanvas.width = window.innerWidth;
-        matrixCanvas.height = window.innerHeight;
-        if (isAnime) {
-          startParticles();
-        } else {
-          startMatrix();
-        }
-      }
-
-      // CIA — matrix rain
-      function startMatrix() {
-        const cols = Math.floor(matrixCanvas.width / 16);
-        const drops = Array(cols).fill(1);
-        const chars =
-          "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&アイウエオカキクケコサシスセソ";
-
-        matrixInterval = setInterval(() => {
-          mCtx.fillStyle = "rgba(0,0,0,0.05)";
-          mCtx.fillRect(0, 0, matrixCanvas.width, matrixCanvas.height);
-          mCtx.fillStyle = "#00ff41";
-          mCtx.font = "14px Share Tech Mono";
-          drops.forEach((y, i) => {
-            const char = chars[Math.floor(Math.random() * chars.length)];
-            mCtx.fillText(char, i * 16, y * 16);
-            if (y * 16 > matrixCanvas.height && Math.random() > 0.975)
-              drops[i] = 0;
-            drops[i]++;
-          });
-        }, 50);
-      }
-
-      // Anime — floating particles
-      function startParticles() {
-        const particles = Array.from({ length: 60 }, () => ({
-          x: Math.random() * matrixCanvas.width,
-          y: Math.random() * matrixCanvas.height,
-          size: Math.random() * 3 + 1,
-          speedX: (Math.random() - 0.5) * 0.5,
-          speedY: -Math.random() * 0.8 - 0.2,
-          opacity: Math.random() * 0.6 + 0.2,
-          char: ["✦", "✧", "◇", "○", "×", "＊", "　"][
-            Math.floor(Math.random() * 7)
-          ],
-        }));
-
-        matrixInterval = setInterval(() => {
-          mCtx.clearRect(0, 0, matrixCanvas.width, matrixCanvas.height);
-          particles.forEach((p) => {
-            mCtx.fillStyle = `rgba(0,255,255,${p.opacity})`;
-            mCtx.font = `${p.size * 6}px Noto Sans JP`;
-            mCtx.fillText(p.char, p.x, p.y);
-            p.x += p.speedX;
-            p.y += p.speedY;
-            if (p.y < -20) {
-              p.y = matrixCanvas.height + 20;
-              p.x = Math.random() * matrixCanvas.width;
-            }
-          });
-        }, 40);
-      }
-
-      window.addEventListener("resize", restartMatrix);
-      restartMatrix();
+      // ── Start ─────────────────────────────────────
       startCamera();
     </script>
   </body>
