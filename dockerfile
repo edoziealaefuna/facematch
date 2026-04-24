@@ -23,4 +23,4 @@ COPY . .
 EXPOSE 5000
 
 CMD ["python", "app.py"]
-"@ | Out-File -FilePath Dockerfile -Encoding UTF8
+"@ | Out-File -FilePath Dockerfile -Encoding UTF8 -NoNewline
